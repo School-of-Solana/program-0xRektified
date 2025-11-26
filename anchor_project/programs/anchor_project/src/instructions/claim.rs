@@ -25,13 +25,15 @@ pub fn claim(ctx: Context<ClaimContext>, pool_id: u8, epoch: u64) -> Result<()> 
         .checked_mul(ctx.accounts.config.position_price)
         .ok_or(error!(crate::errors::Errors::InvalidMul))?;
 
-    let numerator = ctx.accounts.commitment.weight
-        .checked_mul(token_amount)
+    let numerator = (ctx.accounts.commitment.weight as u128)
+        .checked_mul(token_amount as u128)
         .ok_or(error!(crate::errors::Errors::InvalidMul))?;
 
     let reward = numerator
-        .checked_div(ctx.accounts.epoch_result.weight)
-        .ok_or(error!(crate::errors::Errors::InvalidDiv))?;
+        .checked_div(ctx.accounts.epoch_result.weight as u128)
+        .ok_or(error!(crate::errors::Errors::InvalidDiv))?
+        .try_into()
+        .map_err(|_| error!(crate::errors::Errors::InvalidMul))?; // Convert back to u64
 
     let treasury_seed = SEED_TREASURY;
     let signer_seeds: &[&[&[u8]]] = &[&[
