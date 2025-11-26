@@ -33,7 +33,6 @@ export default function AppPage() {
             </div>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2 text-xs">
-                <span className="text-slate-600 dark:text-slate-400">Network:</span>
                 <NetworkSwitcher />
               </div>
               {error ? (

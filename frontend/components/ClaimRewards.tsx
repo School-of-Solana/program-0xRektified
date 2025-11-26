@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useAnchorProgram } from '@/hooks/useAnchorProgram';
-import { usePools } from '@/hooks/usePools';
 import { useProtocol } from '@/contexts/ProtocolContext';
 import { getEpochResultPda, getCommitmentPda } from '@/lib/pda';
 import { TOKEN_2022_PROGRAM_ID } from '@solana/spl-token';
@@ -16,8 +15,7 @@ interface ClaimableReward {
 
 export function ClaimRewards() {
   const { program, wallet, programId } = useAnchorProgram();
-  const { config, refetch, markCommitmentClaimed } = useProtocol();
-  const { previousEpochPools } = usePools(true);
+  const { config, commitments, refetch, removeCommitment } = useProtocol();
   const [claimableRewards, setClaimableRewards] = useState<ClaimableReward[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,38 +29,60 @@ export function ClaimRewards() {
 
     const fetchClaimableRewards = async () => {
       try {
-        const previousEpoch = config.currentEpoch - 1;
         const rewards: ClaimableReward[] = [];
-        try {
-          const [epochResultPda] = getEpochResultPda(previousEpoch, programId);
-          const epochResult = await program.account.epochResult.fetch(epochResultPda);
-          const winningPoolId = epochResult.winningPoolId;
-          const [commitmentPda] = getCommitmentPda(
-            wallet.publicKey,
-            winningPoolId,
-            previousEpoch,
-            programId
-          );
 
+
+        const pastCommitments = commitments.filter(c => c.epoch < config.currentEpoch);
+
+        for (const commitment of pastCommitments) {
           try {
-            const commitment = await program.account.commitment.fetch(commitmentPda);
-            const userWeight = commitment.weight.toNumber();
-            const totalWeight = epochResult.weight.toNumber();
-            const totalPositionAmount = epochResult.totalPositionAmount.toNumber();
-            const positionPrice = config.positionPrice;
-            const totalReward = totalPositionAmount * positionPrice;
-            const estimatedReward = totalWeight > 0 ? (userWeight / totalWeight) * totalReward : 0;
+            const [epochResultPda] = getEpochResultPda(commitment.epoch, programId);
+            const epochResult = await program.account.epochResult.fetch(epochResultPda);
 
-            rewards.push({
-              poolId: winningPoolId,
-              epoch: previousEpoch,
-              estimatedReward,
-            });
+            if (!epochResult.epochResultState ||
+                (epochResult.epochResultState as any).resolved === undefined) {
+              continue;
+            }
+
+            const winningPoolId = epochResult.winningPoolId;
+            if (commitment.poolId !== winningPoolId) {
+              removeCommitment(commitment.poolId, commitment.epoch);
+              continue;
+            }
+
+            const [commitmentPda] = getCommitmentPda(
+              wallet.publicKey,
+              commitment.poolId,
+              commitment.epoch,
+              programId
+            );
+
+            try {
+              const onChainCommitment = await program.account.commitment.fetch(commitmentPda);
+              const userWeight = onChainCommitment.weight.toNumber();
+              const totalWeight = epochResult.weight.toNumber();
+              const totalPositionAmount = epochResult.totalPositionAmount.toNumber();
+              const positionPrice = config.positionPrice;
+              const totalReward = totalPositionAmount * positionPrice;
+              const estimatedReward = totalWeight > 0 ? (userWeight / totalWeight) * totalReward : 0;
+
+              const claimedKey = `claimed_${wallet.publicKey.toString()}_${commitment.poolId}_${commitment.epoch}`;
+              const alreadyClaimed = localStorage.getItem(claimedKey) === 'true';
+
+              if (!alreadyClaimed && estimatedReward > 0) {
+                rewards.push({
+                  poolId: commitment.poolId,
+                  epoch: commitment.epoch,
+                  estimatedReward,
+                });
+              } else if (alreadyClaimed) {
+                removeCommitment(commitment.poolId, commitment.epoch);
+              }
+            } catch (err) {
+              removeCommitment(commitment.poolId, commitment.epoch);
+            }
           } catch (err) {
-            // User didn't commit to winning pool
           }
-        } catch (err) {
-          // Epoch not resolved yet
         }
 
         setClaimableRewards(rewards);
@@ -72,7 +92,7 @@ export function ClaimRewards() {
     };
 
     fetchClaimableRewards();
-  }, [program, wallet, programId, config]);
+  }, [program, wallet, programId, config, commitments, removeCommitment]);
 
   const handleClaim = async (reward: ClaimableReward) => {
     if (!program || !wallet || !programId || !config) return;
@@ -82,12 +102,6 @@ export function ClaimRewards() {
     setSuccess(null);
 
     try {
-      console.log('Claiming reward:', {
-        epoch: reward.epoch,
-        poolId: reward.poolId,
-        estimatedReward: reward.estimatedReward,
-      });
-
       const tx = await program.methods
         .claim(reward.poolId, new anchor.BN(reward.epoch))
         .accounts({
@@ -97,53 +111,23 @@ export function ClaimRewards() {
         })
         .rpc();
 
-      setSuccess(`Rewards claimed! Transaction: ${tx.slice(0, 8)}...`);
-      console.log('Claim transaction:', tx);
+      const rewardAmount = (reward.estimatedReward / 1e9).toFixed(4);
+      setSuccess(`Harvested ${rewardAmount} CRYS! Tx: ${tx.slice(0, 8)}...`);
+      removeCommitment(reward.poolId, reward.epoch);
 
-      // Mark commitment as claimed in localStorage and refetch
-      markCommitmentClaimed(reward.poolId, reward.epoch);
+      const claimedKey = `claimed_${wallet.publicKey.toString()}_${reward.poolId}_${reward.epoch}`;
+      localStorage.setItem(claimedKey, 'true');
+
       await refetch();
 
       // Remove this reward from the list
       setClaimableRewards(prev => prev.filter(r => r.poolId !== reward.poolId || r.epoch !== reward.epoch));
     } catch (err: any) {
-      console.error('Failed to claim rewards:', err);
       setError(err.message || 'Failed to claim rewards');
     } finally {
       setLoading(false);
     }
   };
-
-  if (!wallet) {
-    return (
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border-2 border-purple-100 dark:border-purple-900 p-6">
-        <h3 className="text-xl font-bold text-purple-900 dark:text-purple-100 mb-2">
-          SEASON REWARDS
-        </h3>
-        <p className="text-purple-600 dark:text-purple-400 text-sm">
-          Connect your wallet to harvest your winnings
-        </p>
-      </div>
-    );
-  }
-
-  if (claimableRewards.length === 0) {
-    return (
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border-2 border-purple-100 dark:border-purple-900 p-6">
-        <h3 className="text-xl font-bold text-purple-900 dark:text-purple-100 mb-2">
-          SEASON REWARDS
-        </h3>
-        <p className="text-purple-600 dark:text-purple-400 text-sm mb-4">
-          No rewards available to harvest
-        </p>
-        {config && config.currentEpoch === 0 && (
-          <p className="text-purple-700 dark:text-purple-300 text-xs bg-purple-50 dark:bg-purple-900/30 rounded px-3 py-2">
-            Complete at least one season to earn rewards
-          </p>
-        )}
-      </div>
-    );
-  }
 
   return (
     <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border-2 border-purple-100 dark:border-purple-900 p-6">
@@ -156,8 +140,26 @@ export function ClaimRewards() {
         </p>
       </div>
 
-      <div className="space-y-4">
-        {claimableRewards.map((reward) => (
+      {!wallet ? (
+        <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+          <p className="text-purple-700 dark:text-purple-300 text-sm">
+            Connect your wallet to view and claim rewards
+          </p>
+        </div>
+      ) : claimableRewards.length === 0 ? (
+        <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-600">
+          <p className="text-slate-700 dark:text-slate-300 text-sm mb-2">
+            No rewards available to harvest
+          </p>
+          {config && config.currentEpoch === 0 && (
+            <p className="text-slate-600 dark:text-slate-400 text-xs">
+              Complete at least one season to earn rewards
+            </p>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {claimableRewards.map((reward) => (
           <div
             key={`${reward.epoch}-${reward.poolId}`}
             className="p-5 bg-slate-50 dark:bg-slate-700/50 rounded-lg shadow-md border-2 border-purple-200 dark:border-purple-800"
@@ -195,7 +197,8 @@ export function ClaimRewards() {
             <p className="text-cyan-700 dark:text-cyan-300 text-sm">{success}</p>
           </div>
         )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

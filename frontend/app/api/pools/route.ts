@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getProgram, getNetworkFromRequest, getConfigPda } from '@/lib/api/rpc';
+import { getProgram, getNetworkFromRequest, getConfigPda, getPoolPda } from '@/lib/api/rpc';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+// Maximum number of pools per epoch (from your protocol)
+const MAX_POOLS = 10;
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,7 +15,6 @@ export async function GET(request: NextRequest) {
 
     const program = await getProgram(network);
 
-    // Get current epoch if not specified
     let epoch: number;
     if (epochParam) {
       epoch = parseInt(epochParam);
@@ -22,24 +24,25 @@ export async function GET(request: NextRequest) {
       epoch = configData.currentEpoch?.toNumber() || 0;
     }
 
-    // Fetch all pools and filter by epoch on the server
-    // This is more reliable than using memcmp filters with complex encodings
-    const allPoolsData = await program.account.pool.all().catch((error) => {
-      console.error('Failed to fetch pools:', error);
-      return [];
-    });
+    // This fetches only the pools for this epoch instead of all pools ever created
+    const poolPromises = [];
+    for (let poolId = 0; poolId < MAX_POOLS; poolId++) {
+      const poolPda = getPoolPda(program.programId, poolId, epoch);
+      poolPromises.push(
+        program.account.pool.fetch(poolPda)
+          .then((account) => ({ poolId, account, publicKey: poolPda }))
+          .catch(() => null)
+      );
+    }
 
-    // Filter pools for the specified epoch
-    const poolsData = allPoolsData.filter(
-      (pool) => pool.account.epoch?.toNumber() === epoch
-    );
+    const poolResults = await Promise.all(poolPromises);
+    const poolsData = poolResults.filter((p) => p !== null);
 
-    // Convert pool data to JSON-serializable format
     const pools = poolsData.map((pool) => ({
       publicKey: pool.publicKey.toString(),
       account: {
         epoch: pool.account.epoch?.toNumber() || 0,
-        poolId: pool.account.id, // 'id' field in the on-chain account
+        poolId: pool.account.id,
         totalWeight: pool.account.totalWeight?.toNumber() || 0,
         totalPositions: pool.account.totalPositions?.toNumber() || 0,
       },

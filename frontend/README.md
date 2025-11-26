@@ -27,7 +27,6 @@ The app automatically detects the deployed network from `deployments/deployment-
 - **Pool Commitments**: Commit positions to pools in active epochs
 - **Weight Display**: Real-time weight calculation with aging
 - **Reward Claims**: Claim proportional rewards from winning pools
-- **Multi-wallet Support**: Phantom, Backpack, Solflare, etc.
 
 ## Project Structure
 

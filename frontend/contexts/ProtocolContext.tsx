@@ -28,7 +28,7 @@ interface Commitment {
   epoch: number;
   claimed: boolean;
   positionId: number;
-  weight: number; // Power at time of commitment
+  weight: number;
 }
 
 interface WeightModel {
@@ -82,6 +82,7 @@ interface ProtocolContextType extends ProtocolData {
   updatePositions: (positions: Position[]) => void;
   updateTokenBalance: (balance: number) => void;
   addCommitment: (commitment: Commitment) => void;
+  removeCommitment: (poolId: number, epoch: number) => void;
   markCommitmentClaimed: (poolId: number, epoch: number) => void;
 }
 
@@ -346,21 +347,23 @@ export function ProtocolProvider({ children }: { children: ReactNode }) {
   }, [fetchConfig, fetchUserData, fetchEpochAndPools, publicKey]);
 
   useEffect(() => {
-    fetchConfig();
-  }, [fetchConfig]);
-
-  useEffect(() => {
     if (publicKey) {
       fetchUserData();
     }
   }, [publicKey, fetchUserData]);
 
   useEffect(() => {
+    // Fetch immediately on mount, then poll every 5 seconds
+    fetchConfig();
     fetchEpochAndPools();
-    const intervalId = setInterval(fetchEpochAndPools, 5000);
+
+    const intervalId = setInterval(() => {
+      fetchConfig();
+      fetchEpochAndPools();
+    }, 5000);
 
     return () => clearInterval(intervalId);
-  }, [fetchEpochAndPools]);
+  }, [fetchConfig, fetchEpochAndPools]);
 
   // Refetch commitments when epoch changes (to get previous epoch rewards)
   useEffect(() => {
@@ -396,6 +399,15 @@ export function ProtocolProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const removeCommitment = useCallback((poolId: number, epoch: number) => {
+    setProtocolData(prev => ({
+      ...prev,
+      commitments: prev.commitments.filter(c =>
+        !(c.poolId === poolId && c.epoch === epoch)
+      ),
+    }));
+  }, []);
+
   const markCommitmentClaimed = useCallback((poolId: number, epoch: number) => {
     setProtocolData(prev => ({
       ...prev,
@@ -411,6 +423,7 @@ export function ProtocolProvider({ children }: { children: ReactNode }) {
     updatePositions,
     updateTokenBalance,
     addCommitment,
+    removeCommitment,
     markCommitmentClaimed,
   };
 

@@ -87,7 +87,7 @@ export async function getProgram(network: Network): Promise<Program<AnchorProjec
   return programCache.get(cacheKey)!;
 }
 
-// Helper to get network from query params or default to devnet
+// Helper to get network from query params or default based on environment
 export function getNetworkFromRequest(searchParams: URLSearchParams): Network {
   const network = searchParams.get('network') as Network | null;
 
@@ -95,7 +95,7 @@ export function getNetworkFromRequest(searchParams: URLSearchParams): Network {
     return network;
   }
 
-  return 'devnet'; // default
+  return process.env.NODE_ENV === 'development' ? 'localnet' : 'devnet';
 }
 
 // PDA helper functions (same as client-side constants)
@@ -115,12 +115,12 @@ export function getConfigPda(programId: PublicKey): PublicKey {
   return pda;
 }
 
-export function getPoolPda(programId: PublicKey, epoch: number, poolId: number): PublicKey {
+export function getPoolPda(programId: PublicKey, poolId: number, epoch: number): PublicKey {
   const [pda] = PublicKey.findProgramAddressSync(
     [
       Buffer.from(POOL_SEED),
-      Buffer.from(new Uint8Array(new BigUint64Array([BigInt(epoch)]).buffer)),
-      Buffer.from([poolId])
+      Buffer.from([poolId]),  // pool_id (u8) comes BEFORE epoch
+      Buffer.from(new Uint8Array(new BigUint64Array([BigInt(epoch)]).buffer))
     ],
     programId
   );

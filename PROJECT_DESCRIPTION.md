@@ -342,19 +342,18 @@ anchor test
 
 ## Additional Notes for Evaluators
 
-**Project Origin:** Built from scratch based on an original concept—time-weighted, burn-to-participate positions as a novel primitive for incentivizing long-term conviction over speculation.
+**Project Origin:** Built from scratch based on an original concept. The idea is simple positions that age and accumulate weight over time, then get burned when committed. Users who hold longer get a bigger share of the reward pool.
 
 **Key Technical Features:**
 - PDA derivation with multiple seeds and compound seed patterns
 - Cross-program invocations (CPI) for Token-2022 transfers
 - Oracle integration via VRF callbacks (Magic Block)
 - Time-based weight logic with Clock sysvar
-- Comprehensive account validation and security checks
-- Full-stack: Anchor + Next.js + Vercel deployment
+
 
 **Infrastructure:**
 1. **Custom Token-2022 Faucet** - On-demand token minting for testing (localnet/devnet)
-2. **Automated Keeper Bot** - Auto-resolves epochs and initializes pools without manual intervention
+2. **Automated Keeper Bot** - Auto-resolves epochs and initializes pools without manual intervention (on my github not pushed in this repo)
 3. **Dual Resolution** - Admin (demo/testing) + Oracle (trustless VRF randomness)
 
 **Testing:** `anchor-litesvm` for fast iteration, time simulation via `set_clock`, deterministic tests. VRF tested on devnet (tests use admin mode).
@@ -363,7 +362,7 @@ anchor test
 
 **Contact:**
 
-0xRektified - School of Solana Exam Project
+0xRektified - School of Solana Exam Project - https://x.com/0xRektified
 
 ---
 

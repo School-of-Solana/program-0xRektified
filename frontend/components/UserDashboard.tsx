@@ -240,15 +240,13 @@ export function UserDashboard() {
         </div>
 
         {/* Faucet Button */}
-        {!hasClaimed && (
-          <button
-            onClick={handleFaucet}
-            disabled={loading}
-            className="w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-lg transition-all font-semibold shadow-md hover:shadow-lg transform hover:scale-[1.02] disabled:transform-none"
-          >
-            {loading ? 'Claiming...' : 'Claim from Faucet to Start'}
-          </button>
-        )}
+        <button
+          onClick={handleFaucet}
+          disabled={loading}
+          className="w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-lg transition-all font-semibold shadow-md hover:shadow-lg transform hover:scale-[1.02] disabled:transform-none"
+        >
+          {loading ? 'Claiming...' : hasClaimed ? 'Claim More from Faucet' : 'Claim from Faucet to Start'}
+        </button>
 
         {faucetSuccess && (
           <div className="mt-3 p-3 bg-cyan-50 dark:bg-cyan-900/20 rounded-lg border border-cyan-200 dark:border-cyan-800">
