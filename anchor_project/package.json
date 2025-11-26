@@ -1,0 +1,45 @@
+{
+  "license": "ISC",
+  "scripts": {
+    "test": "anchor test",
+    "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
+    "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check",
+    "build": "anchor keys sync && anchor build",
+    "postbuild": "mkdir -p ../frontend/idl && cp target/idl/anchor_project.json target/idl/faucet.json ../frontend/idl/ && cp target/types/anchor_project.ts target/types/faucet.ts ../frontend/idl/",
+    "deploy:localnet": "bash scripts/deploy.sh localnet",
+    "deploy:devnet": "bash scripts/deploy.sh devnet",
+    "deploy:testnet": "bash scripts/deploy.sh testnet",
+    "faucet:build": "anchor build --program-name faucet",
+    "faucet:deploy:localnet": "bash scripts/faucet-deploy.sh localnet",
+    "faucet:deploy:devnet": "bash scripts/faucet-deploy.sh devnet",
+    "faucet:claim:localnet": "ts-node scripts/faucet-claim.ts --network=localnet",
+    "faucet:claim:devnet": "ts-node scripts/faucet-claim.ts --network=devnet",
+    "admin:update-resolution": "ts-node scripts/admin/update-resolution.ts",
+    "admin:init-pool": "ts-node scripts/admin/init-pool.ts",
+    "admin:resolve": "ts-node scripts/admin/resolve.ts",
+    "user:mint": "ts-node scripts/user/mint-position.ts",
+    "user:commit": "ts-node scripts/user/commit.ts",
+    "user:claim": "ts-node scripts/user/claim.ts",
+    "test:admin": "ts-node scripts/test-admin.ts",
+    "test:user": "ts-node scripts/test-user.ts",
+    "localnet": "solana-test-validator",
+    "logs": "solana logs"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.31.1"
+  },
+  "devDependencies": {
+    "@solana-developers/helpers": "^2.8.1",
+    "@types/bn.js": "^5.1.0",
+    "@types/chai": "^4.3.0",
+    "@types/mocha": "^9.0.0",
+    "anchor-litesvm": "^0.2.1",
+    "chai": "^4.3.4",
+    "litesvm": "^0.3.3",
+    "mocha": "^9.0.3",
+    "prettier": "^2.6.2",
+    "solana-bankrun": "^0.4.0",
+    "ts-mocha": "^10.0.0",
+    "typescript": "^5.7.3"
+  }
+}

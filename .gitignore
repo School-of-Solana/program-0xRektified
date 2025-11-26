@@ -1,0 +1,40 @@
+# Anchor
+.anchor
+target/
+**/*.rs.bk
+test-ledger/
+
+# IDL
+*.so
+
+# Node
+**/node_modules/
+**/runbooks/
+dist/
+*.log
+
+# Yarn
+.yarn/
+.pnp.*
+
+# Environment
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Solana
+test-ledger/
+.deploy/
+
+#surfpool
+.surfpool
